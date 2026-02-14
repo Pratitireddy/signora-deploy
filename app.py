@@ -90,7 +90,8 @@ def speech_to_text():
 
         audio_file = request.files["audio"]
 
-        with tempfile.NamedTemporaryFile(delete=False, suffix=".webm") as temp:
+        # Save as .wav instead of .webm
+        with tempfile.NamedTemporaryFile(delete=False, suffix=".wav") as temp:
             audio_file.save(temp.name)
             temp_path = temp.name
 
@@ -101,6 +102,8 @@ def speech_to_text():
             )
 
         os.remove(temp_path)
+
+        print("Transcript:", transcript["text"])
 
         return jsonify({"text": transcript["text"]})
 
