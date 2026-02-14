@@ -44,44 +44,73 @@
 <script type="module" src="/static/js/script-avatar.js"></script>
 
 <script>
-  const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-  
-  if (SpeechRecognition) {
-      const recognition = new SpeechRecognition();
-      recognition.lang = "en-IN";
-      recognition.continuous = false;
-      recognition.interimResults = false;
+let mediaRecorder;
+let audioChunks = [];
+let isRecording = false;
 
-      const micBtn = document.getElementById("mic-btn");
-      const speechText = document.getElementById("speech-text");
+const micBtn = document.getElementById("mic-btn");
+const speechText = document.getElementById("speech-text");
 
-      micBtn.addEventListener("click", () => {
-        speechText.textContent = "🎤 Listening... Speak now!";
-        speechText.style.color = "blue";
-        recognition.start();
-      });
+micBtn.addEventListener("click", async () => {
 
-      recognition.onresult = (event) => {
-        const text = event.results[0][0].transcript;
-        speechText.textContent = "🗣 " + text;
-        speechText.style.color = "#333";
+  if (!isRecording) {
+    // Start Recording
+    const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+    mediaRecorder = new MediaRecorder(stream);
 
-        if (window.signWord) {
-            window.signWord(text);
+    audioChunks = [];
+
+    mediaRecorder.ondataavailable = (event) => {
+      audioChunks.push(event.data);
+    };
+
+    mediaRecorder.onstop = async () => {
+      speechText.textContent = "Processing...";
+      speechText.style.color = "orange";
+
+      const audioBlob = new Blob(audioChunks, { type: "audio/webm" });
+      const formData = new FormData();
+      formData.append("audio", audioBlob, "speech.webm");
+
+      try {
+        const response = await fetch("/speech-to-text", {
+          method: "POST",
+          body: formData
+        });
+
+        const data = await response.json();
+
+        if (data.text) {
+          speechText.textContent = "🗣 " + data.text;
+          speechText.style.color = "#333";
+
+          if (window.signWord) {
+            window.signWord(data.text);
+          }
         } else {
-            console.warn("Avatar not ready yet.");
+          speechText.textContent = "⚠ Could not recognize speech.";
+          speechText.style.color = "red";
         }
-      };
 
-      recognition.onerror = (e) => {
-        speechText.textContent = "⚠ Error: " + e.error;
+      } catch (error) {
+        speechText.textContent = "⚠ Server error.";
         speechText.style.color = "red";
-      };
+      }
+    };
+
+    mediaRecorder.start();
+    speechText.textContent = "🎤 Listening...";
+    speechText.style.color = "blue";
+    micBtn.textContent = "⏹ Stop Listening";
+    isRecording = true;
 
   } else {
-      alert("Sorry, your browser does not support Speech Recognition.");
+    // Stop Recording
+    mediaRecorder.stop();
+    micBtn.textContent = "🎤 Start Listening";
+    isRecording = false;
   }
+});
 </script>
-
 </body>
 </html>

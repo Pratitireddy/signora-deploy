@@ -3,7 +3,10 @@ import joblib
 import numpy as np
 from flask_cors import CORS
 import os
+import openai
+import tempfile
 
+openai.api_key = os.environ.get("OPENAI_API_KEY")
 app = Flask(__name__)
 CORS(app)
 
@@ -75,9 +78,35 @@ def predict():
         })
 
     except Exception as e:
-        print(e)
-        return jsonify({"prediction": None, "confidence": 0.0})
+       print(e)
+    return jsonify({"prediction": None, "confidence": 0.0})
+        
+    
+@app.route("/speech-to-text", methods=["POST"])
+def speech_to_text():
+    try:
+        if "audio" not in request.files:
+            return jsonify({"text": None})
 
+        audio_file = request.files["audio"]
+
+        with tempfile.NamedTemporaryFile(delete=False, suffix=".webm") as temp:
+            audio_file.save(temp.name)
+            temp_path = temp.name
+
+        with open(temp_path, "rb") as f:
+            transcript = openai.Audio.transcribe(
+                "whisper-1",
+                f
+            )
+
+        os.remove(temp_path)
+
+        return jsonify({"text": transcript["text"]})
+
+    except Exception as e:
+        print("Speech API Error:", e)
+        return jsonify({"text": None})
 # ==============================
 # START SERVER (RENDER)
 # ==============================
